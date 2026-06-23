@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.Python
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.jks
+credentials.json
+secrets.json
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Elastic and runtime data
+data/incoming/*.jsonl
+data/incoming/*.ndjson
+data/incoming/*.log
+logs/
+*.log
+
+# Generated ML artifacts
+notebooks/data/data_prepared/*.npy
+notebooks/data/data_prepared/*.pkl
+notebooks/models/*.pkl
+
+# OS and IDE
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.code-workspace
+
+# Docker and dependency caches
+.docker/
+.cache/
+pip-wheel-metadata/

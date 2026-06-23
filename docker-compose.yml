@@ -1,0 +1,147 @@
+# ================================================================
+#  UMTS KPI Analytics — Stack ELK
+#  Versions : Elasticsearch 8.13 / Kibana 8.13 / Logstash 8.13 / Filebeat 8.13
+#  Mode     : single-node, sécurité désactivée (usage local/PFE)
+#  RAM min  : 4 Go allouée à Docker Desktop
+# ================================================================
+
+services:
+
+  # ── 1. Elasticsearch ─────────────────────────────────────────
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    container_name: umts-es
+    environment:
+      - node.name=umts-node1
+      - cluster.name=umts-cluster
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.security.http.ssl.enabled=false
+      - xpack.security.transport.ssl.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - cluster.routing.allocation.disk.threshold_enabled=false
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+      - ./elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
+    ports:
+      - "9200:9200"
+    networks:
+      - elk
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 90s
+
+  # ── 2. Kibana ─────────────────────────────────────────────────
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.13.4
+    container_name: umts-kibana
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - SERVER_NAME=umts-kibana
+      - SERVER_HOST=0.0.0.0
+      - TELEMETRY_ENABLED=false
+    volumes:
+      - ./kibana.yml:/usr/share/kibana/config/kibana.yml:ro
+      - kibdata:/usr/share/kibana/data
+    ports:
+      - "5601:5601"
+    networks:
+      - elk
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:5601/api/status | grep -q '\"level\":\"available\"' || exit 1"]
+      interval: 20s
+      timeout: 15s
+      retries: 15
+      start_period: 120s
+
+  # ── 3. Logstash ───────────────────────────────────────────────
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.13.4
+    container_name: umts-logstash
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      - LS_JAVA_OPTS=-Xms512m -Xmx512m
+    volumes:
+      - ./logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+      - ./umts_kpi.conf:/usr/share/logstash/pipeline/umts_kpi.conf:ro
+      - ./data/incoming:/data/incoming:ro
+    ports:
+      - "5044:5044"
+      - "9600:9600"
+    networks:
+      - elk
+    restart: unless-stopped
+
+  # ── 4. Filebeat ───────────────────────────────────────────────
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.13.4
+    container_name: umts-filebeat
+    user: root
+    depends_on:
+      logstash:
+        condition: service_started
+    volumes:
+      - ./filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - ./data/incoming:/data/incoming:ro
+      - fbdata:/usr/share/filebeat/data
+    command: filebeat -e --strict.perms=false
+    networks:
+      - elk
+    restart: unless-stopped
+
+  # ── 5. Ingestion Python (run-once) ────────────────────────────
+  #  Lance le pipeline KPI + prédictions ML → Elasticsearch
+  #  S'exécute une seule fois au démarrage
+  ingestion:
+    image: python:3.11-slim
+    container_name: umts-ingestion
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      - ELASTICSEARCH_HOST=http://elasticsearch:9200
+      - DATA_PATH=/project-data/data.csv
+      - MODEL_PATH=/models
+      - PREP_PATH=/project-data/data_prepared
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./ingest_pipeline.py:/app/ingest_pipeline.py:ro
+      - ./notebooks/data:/project-data:ro
+      - ./notebooks/models:/models:ro
+      - ./data/incoming:/data/incoming
+    working_dir: /app
+    networks:
+      - elk
+    restart: "no"
+    command: >
+      bash -c "
+        pip install --quiet --no-cache-dir pandas==2.2.2 numpy==1.26.4 scikit-learn==1.8.0 elasticsearch==8.13.2 joblib==1.4.2 &&
+        echo 'Dependencies installed' &&
+        python ingest_pipeline.py
+      "
+
+volumes:
+  esdata:
+    driver: local
+  kibdata:
+    driver: local
+  fbdata:
+    driver: local
+
+networks:
+  elk:
+    driver: bridge

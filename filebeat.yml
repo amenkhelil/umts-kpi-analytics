@@ -1,0 +1,64 @@
+# ================================================================
+#  Filebeat — Configuration UMTS KPI Analytics
+#  Version : 8.13.4
+#
+#  Surveille deux types de fichiers dans ./data/incoming/ :
+#    - *.jsonl  → sortie enrichie de ingest_pipeline.py
+#    - *.csv    → data.csv brut (optionnel, si besoin de reparsing)
+# ================================================================
+
+filebeat.inputs:
+
+  # ── Source 1 : JSONL enrichi (ingest_pipeline.py) ──────────
+  - type: filestream
+    id: umts-jsonl
+    enabled: true
+    paths:
+      - /data/incoming/*.jsonl
+      - /data/incoming/*.ndjson
+    parsers:
+      - ndjson:
+          target: ""
+          overwrite_keys: true
+          expand_keys: false
+          add_error_key: true
+    tags: ["umts_jsonl", "ml_enriched"]
+    fields:
+      data_type: json_enriched
+    fields_under_root: false
+
+  # ── Source 2 : CSV brut (data.csv original) ─────────────────
+  # Utile si on veut aussi passer le CSV brut par Logstash
+  - type: filestream
+    id: umts-csv
+    enabled: true
+    paths:
+      - /data/incoming/*.csv
+    # Pas de parser JSON — on envoie la ligne brute à Logstash
+    # qui s'occupe du parsing CSV
+    tags: ["umts_csv", "raw_kpi"]
+    fields:
+      data_type: csv_raw
+    fields_under_root: false
+    # Ne pas lire les fichiers déjà traités
+    close.on_state_change.inactive: "10m"
+    prospector.scanner.fingerprint.enabled: true
+
+# ── Output : Logstash ────────────────────────────────────────
+output.logstash:
+  hosts: ["logstash:5044"]
+  timeout:     30
+  max_retries: 5
+  backoff.init: 2s
+  backoff.max:  60s
+
+# ── Registry (suivi des fichiers déjà lus) ───────────────────
+filebeat.registry.path: /usr/share/filebeat/data/registry
+
+# ── Logging ──────────────────────────────────────────────────
+logging.level: warning
+logging.to_files: false
+logging.metrics.enabled: false
+
+# ── Monitoring : désactivé ───────────────────────────────────
+monitoring.enabled: false

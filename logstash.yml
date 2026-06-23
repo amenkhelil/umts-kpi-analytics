@@ -1,0 +1,21 @@
+# ================================================================
+#  Logstash — Configuration locale UMTS
+# ================================================================
+
+# API REST Logstash (healthcheck)
+http.host: "0.0.0.0"
+http.port: 9600
+
+# Chemin pipeline
+path.config: /usr/share/logstash/pipeline
+
+# Performance — 2 workers suffisent en local
+pipeline.workers: 2
+pipeline.batch.size: 125
+pipeline.batch.delay: 50
+
+# Désactiver monitoring xpack (évite les erreurs de connexion)
+xpack.monitoring.enabled: false
+
+# Logs
+log.level: warn

@@ -1,0 +1,24 @@
+# ================================================================
+#  Elasticsearch — Configuration locale UMTS
+# ================================================================
+
+cluster.name: umts-cluster
+node.name: umts-node1
+
+# Réseau
+network.host: 0.0.0.0
+http.port: 9200
+
+# Single node
+discovery.type: single-node
+
+# Sécurité : désactivée (local)
+xpack.security.enabled: false
+xpack.security.http.ssl.enabled: false
+xpack.security.transport.ssl.enabled: false
+
+# Limites pour usage local
+cluster.max_shards_per_node: 1000
+
+# Logs discrets
+logger.level: WARN

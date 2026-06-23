@@ -1,0 +1,4 @@
+Model,CV ROC-AUC,Val Accuracy,Val Precision,Val Recall,Val F1,Val ROC-AUC,Train Time (s)
+LogisticRegression,0.9970 ± 0.0007,0.9704,0.9767,0.9779,0.9773,0.9965,0.04
+RandomForest,0.9988 ± 0.0003,0.9872,0.9807,1.0,0.9903,0.9985,0.34
+GradientBoosting,0.9995 ± 0.0002,0.988,0.9854,0.9963,0.9908,0.9995,5.36
